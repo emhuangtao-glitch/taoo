@@ -670,7 +670,12 @@
 
         function cleanup(err, payload) {
           clearTimeout(timer);
-          delete window[callback];
+          if (err) {
+            window[callback] = () => {};
+            setTimeout(() => delete window[callback], 30000);
+          } else {
+            delete window[callback];
+          }
           script.remove();
           err ? reject(err) : resolve(payload);
         }
