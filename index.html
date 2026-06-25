@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A股板块资金流动动态图</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --text: #17202a;
+      --muted: #6b7280;
+      --line: #dfe3ea;
+      --red: #d83b38;
+      --green: #15865f;
+      --blue: #2662d9;
+      --amber: #a76800;
+      --shadow: 0 10px 28px rgba(31, 41, 55, .08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, input, select {
+      font: inherit;
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    header {
+      padding: 18px 22px 12px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn, .select, .range-wrap {
+      min-height: 36px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 7px;
+      box-shadow: 0 1px 0 rgba(17, 24, 39, .03);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 12px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .btn.primary {
+      background: var(--text);
+      color: #fff;
+      border-color: var(--text);
+    }
+
+    .btn:disabled {
+      color: #9ca3af;
+      cursor: not-allowed;
+      background: #f3f4f6;
+    }
+
+    .select {
+      padding: 0 10px;
+      min-width: 96px;
+    }
+
+    .range-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    input[type="range"] {
+      width: 98px;
+      accent-color: var(--blue);
+    }
+
+    .status {
+      max-width: 1440px;
+      margin: 10px auto 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .status strong {
+      color: var(--text);
+      font-weight: 650;
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      white-space: nowrap;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+
+    .dot.red { background: var(--red); }
+    .dot.green { background: var(--green); }
+    .dot.blue { background: var(--blue); }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      gap: 1px;
+      max-width: 1440px;
+      width: calc(100% - 44px);
+      margin: 12px auto 0;
+      border: 1px solid var(--line);
+      background: var(--line);
+    }
+
+    .metric {
+      background: var(--panel);
+      padding: 11px 13px;
+      min-width: 0;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 18px;
+      font-weight: 720;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    main {
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 16px 22px 24px;
+      display: grid;
+      grid-template-columns: minmax(420px, 1fr) minmax(360px, 520px);
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      border-radius: 8px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 13px 15px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .panel-title {
+      font-size: 15px;
+      font-weight: 720;
+    }
+
+    .panel-note {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .bars {
+      height: calc(100vh - 236px);
+      min-height: 520px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .axis {
+      position: absolute;
+      top: 12px;
+      bottom: 12px;
+      left: 50%;
+      width: 1px;
+      background: #cfd5df;
+      z-index: 1;
+    }
+
+    .row {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      height: 30px;
+      transition: transform .38s ease;
+      z-index: 2;
+    }
+
+    .name {
+      position: absolute;
+      left: 0;
+      width: 128px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      font-weight: 640;
+      color: #263241;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      background: linear-gradient(90deg, #fff 76%, rgba(255,255,255,0));
+      z-index: 4;
+    }
+
+    .rank {
+      width: 20px;
+      height: 20px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 11px;
+      flex: 0 0 auto;
+      background: #fff;
+    }
+
+    .track {
+      position: absolute;
+      left: 138px;
+      right: 92px;
+      top: 5px;
+      height: 20px;
+      background:
+        linear-gradient(90deg, rgba(21,134,95,.08), transparent 45%, transparent 55%, rgba(216,59,56,.08));
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .bar {
+      position: absolute;
+      top: 0;
+      height: 20px;
+      min-width: 2px;
+      border-radius: 4px;
+      transition: left .32s ease, width .32s ease, background .2s ease;
+    }
+
+    .bar.pos { background: linear-gradient(90deg, #f06a61, var(--red)); }
+    .bar.neg { background: linear-gradient(90deg, var(--green), #42b27d); }
+
+    .value {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 84px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      font-variant-numeric: tabular-nums;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .value.pos { color: var(--red); }
+    .value.neg { color: var(--green); }
+
+    .chart-wrap {
+      padding: 12px;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .timeline {
+      padding: 12px 15px 15px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: 64px 1fr 64px;
+      gap: 10px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .progress {
+      height: 8px;
+      border-radius: 999px;
+      background: #e6eaf0;
+      overflow: hidden;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: var(--blue);
+      border-radius: inherit;
+      transition: width .25s linear;
+    }
+
+    .list {
+      border-top: 1px solid var(--line);
+      max-height: 236px;
+      overflow: auto;
+    }
+
+    .list-item {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 10px;
+      padding: 9px 12px;
+      border-bottom: 1px solid #eef1f5;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .list-item:last-child { border-bottom: 0; }
+    .muted { color: var(--muted); }
+    .pos { color: var(--red); }
+    .neg { color: var(--green); }
+
+    .file-input {
+      display: none;
+    }
+
+    @media (max-width: 960px) {
+      .topbar, .status {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .actions, .legend {
+        justify-content: flex-start;
+      }
+
+      .summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: calc(100% - 28px);
+      }
+
+      main {
+        grid-template-columns: 1fr;
+        padding: 14px;
+      }
+
+      .bars {
+        height: 560px;
+      }
+
+      .name {
+        width: 104px;
+      }
+
+      .track {
+        left: 112px;
+        right: 78px;
+      }
+
+      .value {
+        width: 72px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="topbar">
+        <div>
+          <h1>A股板块资金流动动态图</h1>
+          <div class="subtitle">09:30 到 15:00，按分钟播放行业/概念板块主力净流入变化</div>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="loadLiveBtn" title="从东方财富公开接口尝试拉取板块资金流">↻ 实时数据</button>
+          <button class="btn" id="loadSiteDataBtn" title="读取站内 data/fund-flow.csv">↧ 站内数据</button>
+          <button class="btn" id="sampleBtn" title="播放内置样例数据">◎ 样例</button>
+          <button class="btn" id="playBtn" title="播放或暂停动画">▶ 播放</button>
+          <button class="btn" id="autoRefreshBtn" title="每 60 秒自动尝试刷新数据">○ 自动刷新</button>
+          <select class="select" id="scopeSelect" title="板块类型">
+            <option value="industry">行业板块</option>
+            <option value="concept">概念板块</option>
+          </select>
+          <select class="select" id="topSelect" title="显示数量">
+            <option value="12">Top 12</option>
+            <option value="20" selected>Top 20</option>
+            <option value="30">Top 30</option>
+          </select>
+          <label class="btn" for="csvInput" title="导入 CSV：time,sector,netFlow">
+            ⇧ CSV
+          </label>
+          <input class="file-input" id="csvInput" type="file" accept=".csv,text/csv">
+          <label class="range-wrap" title="动画速度">
+            速度
+            <input id="speedRange" type="range" min="1" max="8" value="4">
+          </label>
+        </div>
+      </div>
+      <div class="status">
+        <div id="statusText">准备加载数据。</div>
+        <div class="legend">
+          <span><i class="dot red"></i>净流入</span>
+          <span><i class="dot green"></i>净流出</span>
+          <span><i class="dot blue"></i>时间进度</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="summary" aria-label="摘要指标">
+      <div class="metric">
+        <div class="metric-label">当前时间</div>
+        <div class="metric-value" id="timeMetric">--:--</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">全板块净额</div>
+        <div class="metric-value" id="totalMetric">--</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">最强流入</div>
+        <div class="metric-value" id="leaderMetric">--</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">最强流出</div>
+        <div class="metric-value" id="laggardMetric">--</div>
+      </div>
+    </section>
+
+    <main>
+      <section class="panel">
+        <div class="panel-head">
+          <div class="panel-title">板块资金净流入排行</div>
+          <div class="panel-note" id="barNote">单位：亿元</div>
+        </div>
+        <div class="bars" id="bars" aria-label="资金流动排行">
+          <div class="axis"></div>
+        </div>
+        <div class="timeline">
+          <span>09:30</span>
+          <div class="progress"><span id="progressBar"></span></div>
+          <span style="text-align:right">15:00</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div class="panel-title">资金轨迹</div>
+          <div class="panel-note">显示当前排名靠前板块</div>
+        </div>
+        <div class="chart-wrap">
+          <svg id="lineChart" viewBox="0 0 520 320" role="img" aria-label="板块资金流轨迹"></svg>
+        </div>
+        <div class="list" id="detailList"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const EASTMONEY_UT = 'bd1d9ddb04089700cf9c27f6f7426281';
+    const state = {
+      frames: [],
+      sectors: [],
+      cursor: 0,
+      timer: null,
+      playing: false,
+      source: 'sample',
+      rows: new Map()
+    };
+
+    const el = {
+      loadLiveBtn: document.getElementById('loadLiveBtn'),
+      loadSiteDataBtn: document.getElementById('loadSiteDataBtn'),
+      sampleBtn: document.getElementById('sampleBtn'),
+      playBtn: document.getElementById('playBtn'),
+      autoRefreshBtn: document.getElementById('autoRefreshBtn'),
+      scopeSelect: document.getElementById('scopeSelect'),
+      topSelect: document.getElementById('topSelect'),
+      speedRange: document.getElementById('speedRange'),
+      csvInput: document.getElementById('csvInput'),
+      statusText: document.getElementById('statusText'),
+      timeMetric: document.getElementById('timeMetric'),
+      totalMetric: document.getElementById('totalMetric'),
+      leaderMetric: document.getElementById('leaderMetric'),
+      laggardMetric: document.getElementById('laggardMetric'),
+      bars: document.getElementById('bars'),
+      progressBar: document.getElementById('progressBar'),
+      lineChart: document.getElementById('lineChart'),
+      detailList: document.getElementById('detailList')
+    };
+
+    const DATA_CSV_URL = 'data/fund-flow.csv';
+    const AUTO_REFRESH_MS = 60000;
+    let autoRefreshTimer = null;
+
+    function jsonp(url, timeoutMs = 12000) {
+      return new Promise((resolve, reject) => {
+        const callback = `em_cb_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        const script = document.createElement('script');
+        const sep = url.includes('?') ? '&' : '?';
+        const timer = setTimeout(() => cleanup(new Error('接口超时')), timeoutMs);
+
+        function cleanup(err, payload) {
+          clearTimeout(timer);
+          delete window[callback];
+          script.remove();
+          err ? reject(err) : resolve(payload);
+        }
+
+        window[callback] = payload => cleanup(null, payload);
+        script.onerror = () => cleanup(new Error('接口无法访问'));
+        script.src = `${url}${sep}cb=${callback}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    function marketMinutes() {
+      const out = [];
+      const pushRange = (h1, m1, h2, m2) => {
+        let h = h1;
+        let m = m1;
+        while (h < h2 || (h === h2 && m <= m2)) {
+          out.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+          m += 1;
+          if (m === 60) {
+            h += 1;
+            m = 0;
+          }
+        }
+      };
+      pushRange(9, 30, 11, 30);
+      pushRange(13, 0, 15, 0);
+      return out;
+    }
+
+    function formatMoney(v) {
+      const n = Number(v) || 0;
+      const abs = Math.abs(n);
+      if (abs >= 100000000) return `${(n / 100000000).toFixed(2)}亿`;
+      if (abs >= 10000) return `${(n / 10000).toFixed(0)}万`;
+      return `${n.toFixed(0)}`;
+    }
+
+    function toYi(v) {
+      return (Number(v) || 0) / 100000000;
+    }
+
+    function colorFor(i) {
+      const palette = ['#d83b38', '#15865f', '#2662d9', '#a76800', '#7c3aed', '#0f766e', '#b42318', '#4f46e5', '#a16207', '#0369a1', '#be185d', '#417505'];
+      return palette[i % palette.length];
+    }
+
+    function seededNoise(seed) {
+      let x = Math.sin(seed) * 10000;
+      return x - Math.floor(x);
+    }
+
+    function buildSampleData() {
+      const sectors = ['半导体', '证券', '银行', '机器人', '新能源车', '消费电子', '医药商业', '光伏设备', '有色金属', '白酒', '软件开发', '电池', '军工电子', '房地产开发', '通信设备', '游戏', '煤炭开采', '家用电器', '旅游酒店', '电力'];
+      const times = marketMinutes();
+      const frames = times.map((time, ti) => {
+        const dayProgress = ti / (times.length - 1);
+        const values = {};
+        sectors.forEach((name, si) => {
+          const bias = Math.sin(si * 1.7) * 220000000;
+          const wave = Math.sin(dayProgress * Math.PI * (1.2 + (si % 5) * .17) + si * .9) * (520000000 + si * 9000000);
+          const rotation = Math.cos(dayProgress * Math.PI * 2.3 + si * .41) * 210000000;
+          const shock = (seededNoise(si * 13 + ti * .09) - .5) * 90000000;
+          values[name] = Math.round(bias + wave + rotation + shock);
+        });
+        return { time, values };
+      });
+      return { frames, sectors, source: 'sample' };
+    }
+
+    function normalizeFrames(rawSeries) {
+      const byTime = new Map();
+      const sectors = new Set();
+      rawSeries.forEach(item => {
+        sectors.add(item.sector);
+        if (!byTime.has(item.time)) byTime.set(item.time, {});
+        byTime.get(item.time)[item.sector] = Number(item.netFlow) || 0;
+      });
+      const times = Array.from(byTime.keys()).sort((a, b) => a.localeCompare(b));
+      const sectorList = Array.from(sectors);
+      const frames = times.map(time => {
+        const values = {};
+        sectorList.forEach(sector => values[sector] = byTime.get(time)[sector] || 0);
+        return { time, values };
+      });
+      return { frames, sectors: sectorList };
+    }
+
+    async function loadLiveData() {
+      setStatus('正在请求东方财富板块列表...');
+      stop();
+      const scope = el.scopeSelect.value;
+      const fs = scope === 'industry' ? 'm:90+t:2' : 'm:90+t:3';
+      const listUrl = `https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=30&po=1&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent(fs)}&fields=f12,f14,f62,f184&ut=${EASTMONEY_UT}`;
+      const listPayload = await jsonp(listUrl);
+      const boards = listPayload?.data?.diff || [];
+      if (!boards.length) throw new Error('没有返回板块列表');
+
+      const picked = boards.slice(0, 20).map(board => ({
+        code: board.f12,
+        name: board.f14,
+        current: Number(board.f62) || 0
+      }));
+
+      setStatus(`已找到 ${picked.length} 个板块，正在拉取日内分钟资金流...`);
+      const series = [];
+      await Promise.all(picked.map(async board => {
+        const secid = `90.${board.code}`;
+        const url = `https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?lmt=0&klt=1&secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63&ut=${EASTMONEY_UT}`;
+        const payload = await jsonp(url);
+        const klines = payload?.data?.klines || [];
+        klines.forEach(line => {
+          const cells = String(line).split(',');
+          const time = String(cells[0] || '').slice(11, 16);
+          const netFlow = Number(cells[1]);
+          if (/^\d{2}:\d{2}$/.test(time) && Number.isFinite(netFlow)) {
+            series.push({ time, sector: board.name, netFlow });
+          }
+        });
+      }));
+
+      if (!series.length) throw new Error('分钟资金流为空');
+      const normalized = normalizeFrames(series);
+      setData({ ...normalized, source: 'eastmoney' });
+      setStatus(`东方财富公开接口加载完成：${normalized.sectors.length} 个板块，${normalized.frames.length} 个时间点。`);
+    }
+
+    async function loadSiteData() {
+      setStatus('正在读取站内 CSV 数据...');
+      stop();
+      const url = `${DATA_CSV_URL}?v=${Date.now()}`;
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`CSV 读取失败：${response.status}`);
+      const parsed = parseCsv(await response.text());
+      if (!parsed.frames.length) throw new Error('CSV 没有可用数据');
+      setData({ ...parsed, source: 'site-csv' });
+      setStatus(`站内 CSV 加载完成：${parsed.sectors.length} 个板块，${parsed.frames.length} 个时间点。`);
+    }
+
+    async function refreshData() {
+      const wasPlaying = state.playing;
+      try {
+        await loadLiveData();
+      } catch (liveErr) {
+        try {
+          await loadSiteData();
+        } catch (csvErr) {
+          const data = buildSampleData();
+          setData(data);
+          setStatus(`实时接口和站内 CSV 暂不可用。实时接口：<strong>${liveErr.message}</strong>；CSV：<strong>${csvErr.message}</strong>。已切换到样例数据。`);
+        }
+      }
+      if (wasPlaying || !state.playing) play();
+    }
+
+    function parseCsv(text) {
+      const lines = text.trim().split(/\r?\n/).filter(Boolean);
+      const head = lines.shift().split(',').map(s => s.trim());
+      const timeIdx = head.indexOf('time');
+      const sectorIdx = head.indexOf('sector');
+      const flowIdx = head.indexOf('netFlow');
+      if (timeIdx < 0 || sectorIdx < 0 || flowIdx < 0) {
+        throw new Error('CSV 表头需要包含 time,sector,netFlow');
+      }
+      return normalizeFrames(lines.map(line => {
+        const cells = line.split(',').map(s => s.trim());
+        return {
+          time: cells[timeIdx],
+          sector: cells[sectorIdx],
+          netFlow: Number(cells[flowIdx])
+        };
+      }));
+    }
+
+    function setData(data) {
+      state.frames = data.frames;
+      state.sectors = data.sectors;
+      state.cursor = 0;
+      state.source = data.source || 'custom';
+      state.rows.clear();
+      el.bars.querySelectorAll('.row').forEach(row => row.remove());
+      render();
+    }
+
+    function currentRanked() {
+      const frame = state.frames[state.cursor] || { values: {} };
+      return Object.entries(frame.values)
+        .map(([sector, value]) => ({ sector, value }))
+        .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+    }
+
+    function renderBars(ranked) {
+      const topN = Number(el.topSelect.value);
+      const visible = ranked.slice(0, topN);
+      const maxAbs = Math.max(1, ...visible.map(d => Math.abs(toYi(d.value))));
+      const containerWidth = el.bars.clientWidth || 900;
+      const trackLeft = containerWidth <= 700 ? 112 : 138;
+      const trackRight = containerWidth <= 700 ? 78 : 92;
+      const trackWidth = Math.max(120, containerWidth - 28 - trackLeft - trackRight);
+      const half = trackWidth / 2;
+      const rowGap = Math.max(33, Math.min(42, (el.bars.clientHeight - 28) / Math.max(topN, 1)));
+
+      visible.forEach((item, i) => {
+        let row = state.rows.get(item.sector);
+        if (!row) {
+          row = document.createElement('div');
+          row.className = 'row';
+          row.innerHTML = `
+            <div class="name"><span class="rank"></span><span class="label"></span></div>
+            <div class="track"><span class="bar"></span></div>
+            <div class="value"></div>
+          `;
+          el.bars.appendChild(row);
+          state.rows.set(item.sector, row);
+        }
+        const yi = toYi(item.value);
+        const width = Math.max(2, Math.abs(yi) / maxAbs * (half - 4));
+        const left = yi >= 0 ? half : half - width;
+        row.style.transform = `translateY(${12 + i * rowGap}px)`;
+        row.style.display = '';
+        row.querySelector('.rank').textContent = i + 1;
+        row.querySelector('.label').textContent = item.sector;
+        const bar = row.querySelector('.bar');
+        bar.className = `bar ${yi >= 0 ? 'pos' : 'neg'}`;
+        bar.style.left = `${left}px`;
+        bar.style.width = `${width}px`;
+        const value = row.querySelector('.value');
+        value.className = `value ${yi >= 0 ? 'pos' : 'neg'}`;
+        value.textContent = `${yi >= 0 ? '+' : ''}${yi.toFixed(2)}亿`;
+      });
+
+      state.rows.forEach((row, sector) => {
+        if (!visible.some(item => item.sector === sector)) row.style.display = 'none';
+      });
+    }
+
+    function renderLineChart(ranked) {
+      const w = 520;
+      const h = 320;
+      const pad = { l: 46, r: 16, t: 18, b: 34 };
+      const top = ranked.slice(0, Math.min(8, Number(el.topSelect.value)));
+      const names = top.map(d => d.sector);
+      const frames = state.frames;
+      const maxAbs = Math.max(1, ...frames.flatMap(frame => names.map(name => Math.abs(toYi(frame.values[name] || 0)))));
+      const x = idx => pad.l + idx / Math.max(1, frames.length - 1) * (w - pad.l - pad.r);
+      const y = val => pad.t + (1 - ((val / maxAbs) + 1) / 2) * (h - pad.t - pad.b);
+
+      const grid = [-1, -.5, 0, .5, 1].map(level => {
+        const yy = y(level * maxAbs);
+        return `<line x1="${pad.l}" y1="${yy}" x2="${w - pad.r}" y2="${yy}" stroke="${level === 0 ? '#cfd5df' : '#edf0f4'}" />
+          <text x="8" y="${yy + 4}" fill="#7a8491" font-size="11">${(level * maxAbs).toFixed(1)}</text>`;
+      }).join('');
+
+      const paths = names.map((name, i) => {
+        const points = frames.slice(0, state.cursor + 1).map((frame, idx) => `${x(idx)},${y(toYi(frame.values[name] || 0))}`).join(' ');
+        return `<polyline points="${points}" fill="none" stroke="${colorFor(i)}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />`;
+      }).join('');
+
+      const cursorX = x(state.cursor);
+      const labels = names.map((name, i) => {
+        const frame = frames[state.cursor] || { values: {} };
+        const yy = y(toYi(frame.values[name] || 0));
+        return `<circle cx="${cursorX}" cy="${yy}" r="3.5" fill="${colorFor(i)}" />
+          <text x="${Math.min(w - 120, cursorX + 7)}" y="${yy - 5}" fill="${colorFor(i)}" font-size="11" font-weight="650">${name}</text>`;
+      }).join('');
+
+      el.lineChart.innerHTML = `
+        <rect x="0" y="0" width="${w}" height="${h}" fill="#fff" />
+        ${grid}
+        <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${h - pad.b}" stroke="#d8dde6" />
+        <line x1="${pad.l}" y1="${h - pad.b}" x2="${w - pad.r}" y2="${h - pad.b}" stroke="#d8dde6" />
+        ${paths}
+        <line x1="${cursorX}" y1="${pad.t}" x2="${cursorX}" y2="${h - pad.b}" stroke="#2662d9" stroke-dasharray="4 4" />
+        ${labels}
+        <text x="${pad.l}" y="${h - 10}" fill="#7a8491" font-size="11">09:30</text>
+        <text x="${w - pad.r - 34}" y="${h - 10}" fill="#7a8491" font-size="11">15:00</text>
+        <text x="8" y="16" fill="#7a8491" font-size="11">亿元</text>
+      `;
+    }
+
+    function renderDetails(ranked) {
+      const top = ranked.slice(0, 12);
+      el.detailList.innerHTML = top.map((item, idx) => {
+        const cls = item.value >= 0 ? 'pos' : 'neg';
+        return `<div class="list-item">
+          <strong>${idx + 1}. ${item.sector}</strong>
+          <span class="${cls}">${formatMoney(item.value)}</span>
+          <span class="muted">${item.value >= 0 ? '流入' : '流出'}</span>
+        </div>`;
+      }).join('');
+    }
+
+    function renderSummary(ranked) {
+      const frame = state.frames[state.cursor] || { time: '--:--', values: {} };
+      const total = Object.values(frame.values).reduce((sum, value) => sum + value, 0);
+      const byValue = Object.entries(frame.values).map(([sector, value]) => ({ sector, value })).sort((a, b) => b.value - a.value);
+      const leader = byValue[0];
+      const laggard = byValue[byValue.length - 1];
+      el.timeMetric.textContent = frame.time;
+      el.totalMetric.textContent = formatMoney(total);
+      el.totalMetric.className = `metric-value ${total >= 0 ? 'pos' : 'neg'}`;
+      el.leaderMetric.textContent = leader ? `${leader.sector} ${formatMoney(leader.value)}` : '--';
+      el.leaderMetric.className = 'metric-value pos';
+      el.laggardMetric.textContent = laggard ? `${laggard.sector} ${formatMoney(laggard.value)}` : '--';
+      el.laggardMetric.className = 'metric-value neg';
+      const progress = state.frames.length <= 1 ? 0 : state.cursor / (state.frames.length - 1) * 100;
+      el.progressBar.style.width = `${progress}%`;
+    }
+
+    function render() {
+      if (!state.frames.length) return;
+      const ranked = currentRanked();
+      renderSummary(ranked);
+      renderBars(ranked);
+      renderLineChart(ranked);
+      renderDetails(ranked);
+    }
+
+    function tick() {
+      if (!state.frames.length) return;
+      state.cursor = (state.cursor + 1) % state.frames.length;
+      render();
+    }
+
+    function play() {
+      if (state.playing || !state.frames.length) return;
+      state.playing = true;
+      el.playBtn.textContent = 'Ⅱ 暂停';
+      const interval = Math.max(80, 640 - Number(el.speedRange.value) * 70);
+      state.timer = setInterval(tick, interval);
+    }
+
+    function stop() {
+      state.playing = false;
+      el.playBtn.textContent = '▶ 播放';
+      if (state.timer) clearInterval(state.timer);
+      state.timer = null;
+    }
+
+    function startAutoRefresh() {
+      if (autoRefreshTimer) return;
+      el.autoRefreshBtn.textContent = '● 自动刷新';
+      autoRefreshTimer = setInterval(refreshData, AUTO_REFRESH_MS);
+      setStatus('自动刷新已开启：每 60 秒尝试更新一次数据。');
+    }
+
+    function stopAutoRefresh() {
+      if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+      autoRefreshTimer = null;
+      el.autoRefreshBtn.textContent = '○ 自动刷新';
+      setStatus('自动刷新已关闭。');
+    }
+
+    function setStatus(text) {
+      el.statusText.innerHTML = text;
+    }
+
+    el.playBtn.addEventListener('click', () => state.playing ? stop() : play());
+    el.speedRange.addEventListener('input', () => {
+      if (state.playing) {
+        stop();
+        play();
+      }
+    });
+    el.topSelect.addEventListener('change', render);
+    el.scopeSelect.addEventListener('change', () => {
+      setStatus('板块类型已切换，点击“实时数据”重新加载。');
+    });
+    el.autoRefreshBtn.addEventListener('click', () => {
+      autoRefreshTimer ? stopAutoRefresh() : startAutoRefresh();
+    });
+    el.sampleBtn.addEventListener('click', () => {
+      stop();
+      const data = buildSampleData();
+      setData(data);
+      setStatus('正在播放内置样例数据。导入 CSV 或点击“实时数据”可替换数据源。');
+      play();
+    });
+    el.loadLiveBtn.addEventListener('click', async () => {
+      el.loadLiveBtn.disabled = true;
+      try {
+        await loadLiveData();
+        play();
+      } catch (err) {
+        const data = buildSampleData();
+        setData(data);
+        setStatus(`实时接口未能加载：<strong>${err.message}</strong>。已切换到样例数据，页面功能仍可预览。`);
+        play();
+      } finally {
+        el.loadLiveBtn.disabled = false;
+      }
+    });
+    el.loadSiteDataBtn.addEventListener('click', async () => {
+      el.loadSiteDataBtn.disabled = true;
+      try {
+        await loadSiteData();
+        play();
+      } catch (err) {
+        setStatus(`站内 CSV 暂不可用：<strong>${err.message}</strong>。`);
+      } finally {
+        el.loadSiteDataBtn.disabled = false;
+      }
+    });
+    el.csvInput.addEventListener('change', async event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      stop();
+      try {
+        const text = await file.text();
+        const parsed = parseCsv(text);
+        setData({ ...parsed, source: 'csv' });
+        setStatus(`CSV 加载完成：${parsed.sectors.length} 个板块，${parsed.frames.length} 个时间点。`);
+        play();
+      } catch (err) {
+        setStatus(`CSV 解析失败：<strong>${err.message}</strong>`);
+      } finally {
+        event.target.value = '';
+      }
+    });
+    window.addEventListener('resize', render);
+
+    setData(buildSampleData());
+    refreshData();
+  </script>
+</body>
+</html>
