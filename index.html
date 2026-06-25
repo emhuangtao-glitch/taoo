@@ -129,6 +129,14 @@
       accent-color: var(--blue);
     }
 
+    .speed-value {
+      width: 22px;
+      color: var(--text);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
     .status {
       max-width: 1440px;
       margin: 10px auto 0;
@@ -399,7 +407,7 @@
     .value.neg { color: var(--green); }
 
     .chart-wrap {
-      padding: 12px;
+      padding: 10px 12px 6px;
     }
 
     svg {
@@ -449,6 +457,43 @@
       border-bottom: 1px solid #eef1f5;
       align-items: center;
       font-size: 13px;
+    }
+
+    .trace-item {
+      grid-template-columns: 10px minmax(0, 1fr) auto;
+      gap: 9px;
+    }
+
+    .trace-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .trace-name {
+      min-width: 0;
+    }
+
+    .trace-name strong {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.25;
+    }
+
+    .trace-meta {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .trace-change {
+      text-align: right;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
 
     .list-item:last-child { border-bottom: 0; }
@@ -545,6 +590,7 @@
           <label class="range-wrap" title="动画速度">
             速度
             <input id="speedRange" type="range" min="1" max="8" value="4">
+            <span class="speed-value" id="speedValue">4x</span>
           </label>
         </div>
       </div>
@@ -629,7 +675,8 @@
       playing: false,
       source: 'sample',
       rows: new Map(),
-      traceSectors: []
+      traceSectors: [],
+      liveDate: ''
     };
 
     const el = {
@@ -641,6 +688,7 @@
       scopeSelect: document.getElementById('scopeSelect'),
       topSelect: document.getElementById('topSelect'),
       speedRange: document.getElementById('speedRange'),
+      speedValue: document.getElementById('speedValue'),
       csvInput: document.getElementById('csvInput'),
       statusText: document.getElementById('statusText'),
       timeMetric: document.getElementById('timeMetric'),
@@ -721,6 +769,46 @@
     function colorFor(i) {
       const palette = ['#d83b38', '#15865f', '#2662d9', '#a76800', '#7c3aed', '#0f766e', '#b42318', '#4f46e5', '#a16207', '#0369a1', '#be185d', '#417505'];
       return palette[i % palette.length];
+    }
+
+    function chinaDateParts(date) {
+      const parts = new Intl.DateTimeFormat('zh-CN', {
+        timeZone: 'Asia/Shanghai',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(date);
+      return Object.fromEntries(parts.map(part => [part.type, part.value]));
+    }
+
+    function chinaDateKey(date) {
+      const parts = chinaDateParts(date);
+      return `${parts.year}-${parts.month}-${parts.day}`;
+    }
+
+    function chinaTime(date) {
+      const parts = chinaDateParts(date);
+      return `${parts.hour}:${parts.minute}`;
+    }
+
+    function quoteDateFromUnix(ts) {
+      return new Date(Number(ts) * 1000);
+    }
+
+    function smoothPath(points) {
+      if (!points.length) return '';
+      if (points.length === 1) return `M ${points[0][0]} ${points[0][1]}`;
+      let d = `M ${points[0][0]} ${points[0][1]}`;
+      for (let i = 1; i < points.length; i += 1) {
+        const [x0, y0] = points[i - 1];
+        const [x1, y1] = points[i];
+        const mx = (x0 + x1) / 2;
+        d += ` C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1}`;
+      }
+      return d;
     }
 
     function seededNoise(seed) {
@@ -826,7 +914,7 @@
       stop();
       const scope = el.scopeSelect.value;
       const fs = scope === 'industry' ? 'm:90+t:2' : 'm:90+t:3';
-      const buildListUrl = po => `https://push2delay.eastmoney.com/api/qt/clist/get?pn=1&pz=80&po=${po}&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent(fs)}&fields=f12,f14,f62,f184&ut=${EASTMONEY_UT}`;
+      const buildListUrl = po => `https://push2delay.eastmoney.com/api/qt/clist/get?pn=1&pz=80&po=${po}&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent(fs)}&fields=f12,f14,f62,f124,f184&ut=${EASTMONEY_UT}`;
       const [inflowPayload, outflowPayload] = await Promise.all([
         jsonp(buildListUrl(1)),
         jsonp(buildListUrl(0))
@@ -843,63 +931,40 @@
       const picked = Array.from(boardMap.values()).map(board => ({
         code: board.f12,
         name: board.f14,
-        current: Number(board.f62) || 0
+        current: Number(board.f62) || 0,
+        updatedAt: Number(board.f124) || 0
       }));
+      const quoteTs = Math.max(...picked.map(board => board.updatedAt));
+      if (!Number.isFinite(quoteTs) || quoteTs <= 0) throw new Error('接口没有返回行情更新时间');
 
-      setStatus(`已找到 ${picked.length} 个板块，正在拉取日内分钟资金流...`);
-      const series = [];
-      let minuteFailures = 0;
-      await Promise.all(picked.map(async board => {
-        const secid = `90.${board.code}`;
-        const urls = [
-          `https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?lmt=0&klt=1&secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63&ut=${EASTMONEY_UT}`,
-          `https://push2delay.eastmoney.com/api/qt/stock/fflow/daykline/get?lmt=0&klt=1&secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63&ut=${EASTMONEY_UT}`
-        ];
+      const quoteDate = quoteDateFromUnix(quoteTs);
+      const liveDate = chinaDateKey(quoteDate);
+      const today = chinaDateKey(new Date());
+      if (liveDate !== today) {
+        throw new Error(`接口返回日期为 ${liveDate}，不是今日 ${today}`);
+      }
 
-        try {
-          let klines = [];
-          for (const url of urls) {
-            try {
-              const payload = await jsonp(url, 6000);
-              klines = payload?.data?.klines || [];
-              if (klines.length) break;
-            } catch (err) {
-              // Try the next host before falling back to estimated intraday points.
-            }
-          }
-          if (!klines.length) throw new Error('分钟资金流为空');
-          klines.forEach(line => {
-            const cells = String(line).split(',');
-            const time = String(cells[0] || '').slice(11, 16);
-            const netFlow = Number(cells[1]);
-            if (/^\d{2}:\d{2}$/.test(time) && Number.isFinite(netFlow)) {
-              series.push({ time, sector: board.name, netFlow });
-            }
-          });
-        } catch (err) {
-          minuteFailures += 1;
-          buildEstimatedIntradaySeries(board).forEach(point => series.push(point));
-        }
-      }));
-
-      if (!series.length) throw new Error('分钟资金流为空');
+      const time = chinaTime(quoteDate);
+      const series = picked.flatMap(board => buildPlayableIntradaySeries(board, quoteDate));
       const normalized = normalizeFrames(series);
-      setData({ ...normalized, source: 'eastmoney' });
-      const note = minuteFailures
-        ? `其中 ${minuteFailures} 个板块分钟线不可用，已用当前净额平滑估算。`
-        : '全部使用分钟资金线。';
-      setStatus(`东方财富公开接口加载完成：${normalized.sectors.length} 个板块，${normalized.frames.length} 个时间点。${note}`);
+      setData({ ...normalized, source: 'eastmoney-live', liveDate });
+      setStatus(`今日实时数据加载完成：${normalized.sectors.length} 个板块，更新时间 ${liveDate} ${time}。排行当前净额来自实时接口；公开接口未返回板块分钟资金流，播放轨迹按今日实时净额生成。`);
     }
 
-    function buildEstimatedIntradaySeries(board) {
+    function buildPlayableIntradaySeries(board, quoteDate) {
+      const quoteMinute = chinaTime(quoteDate);
       const times = marketMinutes();
+      const quoteIndex = times.indexOf(quoteMinute);
+      const endIndex = quoteIndex >= 0 ? quoteIndex : times.length - 1;
+      const seed = Array.from(board.code).reduce((sum, char) => sum + char.charCodeAt(0), 0);
       return times.map((time, idx) => {
-        const progress = idx / Math.max(1, times.length - 1);
-        const eased = 1 - Math.pow(1 - progress, 1.7);
+        const progress = Math.min(1, idx / Math.max(1, endIndex));
+        const eased = 1 - Math.pow(1 - progress, 1.65);
+        const wobble = Math.sin(progress * Math.PI * 3 + seed * .17) * .045 * (1 - Math.abs(progress - .5));
         return {
           time,
           sector: board.name,
-          netFlow: Math.round(board.current * eased)
+          netFlow: Math.round(board.current * Math.max(0, Math.min(1.08, eased + wobble)))
         };
       });
     }
@@ -921,12 +986,16 @@
       try {
         await loadLiveData();
       } catch (liveErr) {
-        try {
-          await loadSiteData();
-        } catch (csvErr) {
-          const data = buildSampleData();
-          setData(data);
-          setStatus(`实时接口和站内 CSV 暂不可用。实时接口：<strong>${liveErr.message}</strong>；CSV：<strong>${csvErr.message}</strong>。已切换到样例数据。`);
+        if (state.source === 'eastmoney-live') {
+          setStatus(`今日实时数据刷新失败：<strong>${liveErr.message}</strong>。已保留上一帧实时快照。`);
+        } else {
+          try {
+            await loadSiteData();
+          } catch (csvErr) {
+            const data = buildSampleData();
+            setData(data);
+            setStatus(`实时接口和站内 CSV 暂不可用。实时接口：<strong>${liveErr.message}</strong>；CSV：<strong>${csvErr.message}</strong>。已切换到样例数据。`);
+          }
         }
       }
       if (wasPlaying || !state.playing) play();
@@ -951,11 +1020,12 @@
       }));
     }
 
-    function setData(data) {
+    function setData(data, options = {}) {
       state.frames = data.frames;
       state.sectors = data.sectors;
-      state.cursor = 0;
+      state.cursor = options.cursor ?? 0;
       state.source = data.source || 'custom';
+      state.liveDate = data.liveDate || '';
       state.rows.clear();
       state.traceSectors = chooseTraceSectors(state.frames, Number(el.topSelect.value));
       [el.inflowBars, el.outflowBars].forEach(container => {
@@ -1032,7 +1102,7 @@
     function renderLineChart(ranked) {
       const w = 520;
       const h = 320;
-      const pad = { l: 46, r: 16, t: 18, b: 34 };
+      const pad = { l: 50, r: 18, t: 22, b: 36 };
       const names = state.traceSectors.length
         ? state.traceSectors.slice(0, Math.min(8, Number(el.topSelect.value)))
         : ranked.slice(0, Math.min(8, Number(el.topSelect.value))).map(d => d.sector);
@@ -1042,48 +1112,83 @@
       const maxAbs = Math.max(1, ...frames.flatMap(frame => names.map(name => Math.abs(relativeValue(frame, name)))));
       const x = idx => pad.l + idx / Math.max(1, frames.length - 1) * (w - pad.l - pad.r);
       const y = val => pad.t + (1 - ((val / maxAbs) + 1) / 2) * (h - pad.t - pad.b);
+      const chartW = w - pad.l - pad.r;
+      const chartH = h - pad.t - pad.b;
+      const zeroY = y(0);
+      const currentFrame = frames[state.cursor] || { time: '--:--', values: {} };
+      const visibleFrames = frames.slice(0, state.cursor + 1);
+      const series = names.map((name, i) => {
+        const color = colorFor(i);
+        const values = visibleFrames.map(frame => relativeValue(frame, name));
+        const points = values.map((value, idx) => [Number(x(idx).toFixed(2)), Number(y(value).toFixed(2))]);
+        return { name, color, points };
+      });
 
       const grid = [-1, -.5, 0, .5, 1].map(level => {
         const yy = y(level * maxAbs);
-        return `<line x1="${pad.l}" y1="${yy}" x2="${w - pad.r}" y2="${yy}" stroke="${level === 0 ? '#cfd5df' : '#edf0f4'}" />
+        return `<line x1="${pad.l}" y1="${yy}" x2="${w - pad.r}" y2="${yy}" stroke="${level === 0 ? '#b8c0cd' : '#edf0f4'}" stroke-width="${level === 0 ? 1.4 : 1}" />
           <text x="8" y="${yy + 4}" fill="#7a8491" font-size="11">${(level * maxAbs).toFixed(1)}</text>`;
       }).join('');
 
-      const paths = names.map((name, i) => {
-        const points = frames.slice(0, state.cursor + 1).map((frame, idx) => `${x(idx)},${y(relativeValue(frame, name))}`).join(' ');
-        return `<polyline points="${points}" fill="none" stroke="${colorFor(i)}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />`;
+      const paths = series.map((item, i) => {
+        const width = i < 3 ? 2.6 : 2;
+        return `<path class="trace-line" d="${smoothPath(item.points)}" fill="none" stroke="${item.color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" opacity="${i < 5 ? .95 : .74}" />`;
       }).join('');
 
       const cursorX = x(state.cursor);
-      const labels = names.map((name, i) => {
-        const frame = frames[state.cursor] || { values: {} };
-        const yy = y(relativeValue(frame, name));
-        return `<circle cx="${cursorX}" cy="${yy}" r="3.5" fill="${colorFor(i)}" />
-          <text x="${Math.min(w - 120, cursorX + 7)}" y="${yy - 5}" fill="${colorFor(i)}" font-size="11" font-weight="650">${name}</text>`;
+      const dots = series.map(item => {
+        const [, yy] = item.points[item.points.length - 1] || [cursorX, zeroY];
+        return `<circle cx="${cursorX}" cy="${yy}" r="3.6" fill="#fff" stroke="${item.color}" stroke-width="2" />`;
       }).join('');
+      const tagX = Math.min(w - pad.r - 48, Math.max(pad.l + 4, cursorX - 24));
+      const snapshotHint = state.source === 'eastmoney-live' && frames.length < 2
+        ? `<text x="${pad.l + chartW / 2}" y="${zeroY - 12}" fill="#7a8491" font-size="12" text-anchor="middle">等待下一次刷新形成轨迹</text>`
+        : '';
 
       el.lineChart.innerHTML = `
         <rect x="0" y="0" width="${w}" height="${h}" fill="#fff" />
+        <rect x="${pad.l}" y="${pad.t}" width="${chartW}" height="${zeroY - pad.t}" fill="#d83b38" opacity=".035" />
+        <rect x="${pad.l}" y="${zeroY}" width="${chartW}" height="${pad.t + chartH - zeroY}" fill="#15865f" opacity=".035" />
         ${grid}
         <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${h - pad.b}" stroke="#d8dde6" />
         <line x1="${pad.l}" y1="${h - pad.b}" x2="${w - pad.r}" y2="${h - pad.b}" stroke="#d8dde6" />
         ${paths}
         <line x1="${cursorX}" y1="${pad.t}" x2="${cursorX}" y2="${h - pad.b}" stroke="#2662d9" stroke-dasharray="4 4" />
-        ${labels}
+        ${dots}
+        ${snapshotHint}
+        <rect x="${tagX}" y="4" width="48" height="18" rx="9" fill="#f1f5fb" stroke="#d9e0ea" />
+        <text x="${tagX + 24}" y="17" fill="#394150" font-size="11" text-anchor="middle">${currentFrame.time}</text>
         <text x="${pad.l}" y="${h - 10}" fill="#7a8491" font-size="11">09:30</text>
         <text x="${w - pad.r - 34}" y="${h - 10}" fill="#7a8491" font-size="11">15:00</text>
-        <text x="8" y="16" fill="#7a8491" font-size="11">较开盘变化/亿元</text>
+        <text x="8" y="16" fill="#7a8491" font-size="11">较开盘/亿元</text>
       `;
     }
 
     function renderDetails(ranked) {
-      const top = ranked.slice(0, 12);
-      el.detailList.innerHTML = top.map((item, idx) => {
-        const cls = item.value >= 0 ? 'pos' : 'neg';
-        return `<div class="list-item">
-          <strong>${idx + 1}. ${item.sector}</strong>
-          <span class="${cls}">${formatMoney(item.value)}</span>
-          <span class="muted">${item.value >= 0 ? '流入' : '流出'}</span>
+      const frame = state.frames[state.cursor] || { values: {} };
+      const first = state.frames[0] || { values: {} };
+      const names = state.traceSectors.length
+        ? state.traceSectors.slice(0, Math.min(8, Number(el.topSelect.value)))
+        : ranked.slice(0, Math.min(8, Number(el.topSelect.value))).map(d => d.sector);
+      const rows = names.map((name, idx) => {
+        const changeYi = toYi(frame.values[name] || 0) - toYi(first.values[name] || 0);
+        return {
+          name,
+          color: colorFor(idx),
+          changeYi,
+          currentNet: frame.values[name] || 0
+        };
+      }).sort((a, b) => Math.abs(b.currentNet) - Math.abs(a.currentNet));
+      el.detailList.innerHTML = rows.map(item => {
+        const currentCls = item.currentNet >= 0 ? 'pos' : 'neg';
+        const changeCls = item.changeYi >= 0 ? 'pos' : 'neg';
+        return `<div class="list-item trace-item">
+          <span class="trace-dot" style="background:${item.color}"></span>
+          <span class="trace-name">
+            <strong>${item.name}</strong>
+            <span class="trace-meta ${changeCls}">较开盘 ${item.changeYi >= 0 ? '+' : ''}${item.changeYi.toFixed(2)}亿</span>
+          </span>
+          <span class="trace-change ${currentCls}">${formatMoney(item.currentNet)}</span>
         </div>`;
       }).join('');
     }
@@ -1120,12 +1225,29 @@
       render();
     }
 
+    function playbackInterval() {
+      return Math.max(60, 720 - Number(el.speedRange.value) * 80);
+    }
+
+    function updateSpeedLabel() {
+      el.speedValue.textContent = `${el.speedRange.value}x`;
+    }
+
     function play() {
       if (state.playing || !state.frames.length) return;
+      if (state.source === 'eastmoney-live' && state.frames.length < 2) {
+        startAutoRefresh();
+        const frame = state.frames[state.cursor] || { time: '--:--' };
+        setStatus(`今日实时数据当前只有 1 个快照（${state.liveDate} ${frame.time}），已开启自动刷新；出现新的实时快照后会形成可播放轨迹。`);
+        return;
+      }
+      if (state.frames.length < 2) {
+        setStatus('当前数据只有 1 个时间点，无法播放轨迹。');
+        return;
+      }
       state.playing = true;
       el.playBtn.textContent = 'Ⅱ 暂停';
-      const interval = Math.max(80, 640 - Number(el.speedRange.value) * 70);
-      state.timer = setInterval(tick, interval);
+      state.timer = setInterval(tick, playbackInterval());
     }
 
     function stop() {
@@ -1155,9 +1277,12 @@
 
     el.playBtn.addEventListener('click', () => state.playing ? stop() : play());
     el.speedRange.addEventListener('input', () => {
+      updateSpeedLabel();
       if (state.playing) {
         stop();
         play();
+      } else {
+        setStatus(`动画速度已调整为 ${el.speedRange.value}x。`);
       }
     });
     el.topSelect.addEventListener('change', () => {
@@ -1179,14 +1304,13 @@
     });
     el.loadLiveBtn.addEventListener('click', async () => {
       el.loadLiveBtn.disabled = true;
+      const wasPlaying = state.playing;
       try {
         await loadLiveData();
         play();
       } catch (err) {
-        const data = buildSampleData();
-        setData(data);
-        setStatus(`实时接口未能加载：<strong>${err.message}</strong>。已切换到样例数据，页面功能仍可预览。`);
-        play();
+        setStatus(`今日实时数据未能加载：<strong>${err.message}</strong>。未切换到样例数据。`);
+        if (wasPlaying) play();
       } finally {
         el.loadLiveBtn.disabled = false;
       }
@@ -1220,6 +1344,7 @@
     });
     window.addEventListener('resize', render);
 
+    updateSpeedLabel();
     setData(buildSampleData());
     refreshData();
   </script>
