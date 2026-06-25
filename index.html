@@ -172,37 +172,6 @@
     .dot.green { background: var(--green); }
     .dot.blue { background: var(--blue); }
 
-    .summary {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(150px, 1fr));
-      gap: 1px;
-      max-width: 1440px;
-      width: calc(100% - 44px);
-      margin: 12px auto 0;
-      border: 1px solid var(--line);
-      background: var(--line);
-    }
-
-    .metric {
-      background: var(--panel);
-      padding: 11px 13px;
-      min-width: 0;
-    }
-
-    .metric-label {
-      color: var(--muted);
-      font-size: 12px;
-      margin-bottom: 4px;
-    }
-
-    .metric-value {
-      font-size: 18px;
-      font-weight: 720;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
     main {
       max-width: 1440px;
       width: 100%;
@@ -220,28 +189,8 @@
       overflow: hidden;
     }
 
-    .panel-head {
-      padding: 13px 15px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .panel-title {
-      font-size: 15px;
-      font-weight: 720;
-    }
-
-    .panel-note {
-      color: var(--muted);
-      font-size: 12px;
-      text-align: right;
-    }
-
     .rank-grid {
-      height: calc(100vh - 508px);
+      height: calc(100vh - 324px);
       min-height: 360px;
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -272,7 +221,7 @@
     }
 
     .bars {
-      height: calc(100vh - 508px);
+      height: calc(100vh - 324px);
       min-height: 360px;
       position: relative;
       overflow: hidden;
@@ -404,14 +353,19 @@
     .value.neg { color: var(--green); }
 
     .chart-wrap {
-      padding: 12px 14px 4px;
+      padding: 14px 16px 8px;
       border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
     }
 
     svg {
       display: block;
       width: 100%;
       height: auto;
+    }
+
+    .chart-wrap svg {
+      height: clamp(260px, 34vh, 360px);
     }
 
     .timeline {
@@ -441,63 +395,6 @@
       transition: width .25s linear;
     }
 
-    .list {
-      max-height: 156px;
-      overflow: auto;
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      border-bottom: 1px solid var(--line);
-    }
-
-    .list-item {
-      display: grid;
-      grid-template-columns: 1fr auto auto;
-      gap: 10px;
-      padding: 9px 12px;
-      border-right: 1px solid #eef1f5;
-      border-bottom: 1px solid #eef1f5;
-      align-items: center;
-      font-size: 13px;
-    }
-
-    .trace-item {
-      grid-template-columns: 10px minmax(0, 1fr) auto;
-      gap: 9px;
-    }
-
-    .trace-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-    }
-
-    .trace-name {
-      min-width: 0;
-    }
-
-    .trace-name strong {
-      display: block;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      line-height: 1.25;
-    }
-
-    .trace-meta {
-      margin-top: 3px;
-      color: var(--muted);
-      font-size: 12px;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .trace-change {
-      text-align: right;
-      font-weight: 750;
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-
-    .list-item:last-child { border-bottom: 0; }
     .muted { color: var(--muted); }
     .pos { color: var(--red); }
     .neg { color: var(--green); }
@@ -516,11 +413,6 @@
         justify-content: flex-start;
       }
 
-      .summary {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        width: calc(100% - 28px);
-      }
-
       main {
         padding: 14px;
       }
@@ -533,10 +425,6 @@
         height: auto;
         min-height: 0;
         grid-template-columns: 1fr;
-      }
-
-      .list {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
       .rank-board {
@@ -608,31 +496,8 @@
       </div>
     </header>
 
-    <section class="summary" aria-label="摘要指标">
-      <div class="metric">
-        <div class="metric-label">当前时间</div>
-        <div class="metric-value" id="timeMetric">--:--</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">全板块净额</div>
-        <div class="metric-value" id="totalMetric">--</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">最强流入</div>
-        <div class="metric-value" id="leaderMetric">--</div>
-      </div>
-      <div class="metric">
-        <div class="metric-label">最强流出</div>
-        <div class="metric-value" id="laggardMetric">--</div>
-      </div>
-    </section>
-
     <main>
       <section class="panel">
-        <div class="panel-head">
-          <div class="panel-title">板块资金轨迹与排行</div>
-          <div class="panel-note" id="barNote">轨迹、时间轴、排行同步联动</div>
-        </div>
         <div class="chart-wrap">
           <svg id="lineChart" viewBox="0 0 960 280" role="img" aria-label="板块资金流轨迹"></svg>
         </div>
@@ -641,7 +506,6 @@
           <div class="progress"><span id="progressBar"></span></div>
           <span style="text-align:right">15:00</span>
         </div>
-        <div class="list" id="detailList"></div>
         <div class="rank-grid" aria-label="资金流入和流出排行">
           <div class="rank-board">
             <div class="rank-board-head">
@@ -688,17 +552,12 @@
       speedValue: document.getElementById('speedValue'),
       csvInput: document.getElementById('csvInput'),
       statusText: document.getElementById('statusText'),
-      timeMetric: document.getElementById('timeMetric'),
-      totalMetric: document.getElementById('totalMetric'),
-      leaderMetric: document.getElementById('leaderMetric'),
-      laggardMetric: document.getElementById('laggardMetric'),
       inflowBars: document.getElementById('inflowBars'),
       outflowBars: document.getElementById('outflowBars'),
       inflowCount: document.getElementById('inflowCount'),
       outflowCount: document.getElementById('outflowCount'),
       progressBar: document.getElementById('progressBar'),
-      lineChart: document.getElementById('lineChart'),
-      detailList: document.getElementById('detailList')
+      lineChart: document.getElementById('lineChart')
     };
 
     const DATA_CSV_URL = 'data/fund-flow.csv';
@@ -1098,8 +957,8 @@
 
     function renderLineChart(ranked) {
       const w = 960;
-      const h = 280;
-      const pad = { l: 50, r: 18, t: 22, b: 34 };
+      const h = 300;
+      const pad = { l: 56, r: 136, t: 24, b: 34 };
       const names = state.traceSectors.length
         ? state.traceSectors.slice(0, Math.min(8, Number(el.topSelect.value)))
         : ranked.slice(0, Math.min(8, Number(el.topSelect.value))).map(d => d.sector);
@@ -1116,26 +975,64 @@
       const visibleFrames = frames.slice(0, state.cursor + 1);
       const series = names.map((name, i) => {
         const color = colorFor(i);
+        const allValues = frames.map(frame => relativeValue(frame, name));
         const values = visibleFrames.map(frame => relativeValue(frame, name));
+        const current = relativeValue(currentFrame, name);
+        const fullPoints = allValues.map((value, idx) => [Number(x(idx).toFixed(2)), Number(y(value).toFixed(2))]);
         const points = values.map((value, idx) => [Number(x(idx).toFixed(2)), Number(y(value).toFixed(2))]);
-        return { name, color, points };
+        return { name, color, current, fullPoints, points };
       });
 
       const grid = [-1, -.5, 0, .5, 1].map(level => {
         const yy = y(level * maxAbs);
-        return `<line x1="${pad.l}" y1="${yy}" x2="${w - pad.r}" y2="${yy}" stroke="${level === 0 ? '#b8c0cd' : '#edf0f4'}" stroke-width="${level === 0 ? 1.4 : 1}" />
-          <text x="8" y="${yy + 4}" fill="#7a8491" font-size="11">${(level * maxAbs).toFixed(1)}</text>`;
+        return `<line x1="${pad.l}" y1="${yy}" x2="${w - pad.r}" y2="${yy}" stroke="${level === 0 ? '#aeb8c6' : '#e9edf3'}" stroke-width="${level === 0 ? 1.35 : 1}" />
+          <text x="${pad.l - 10}" y="${yy + 4}" fill="#7a8491" font-size="11" text-anchor="end">${(level * maxAbs).toFixed(1)}</text>`;
+      }).join('');
+
+      const ghostPaths = series.map((item, i) => {
+        const width = i < 4 ? 2.2 : 1.7;
+        return `<path d="${smoothPath(item.fullPoints)}" fill="none" stroke="${item.color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" opacity="${i < 5 ? .18 : .11}" />`;
       }).join('');
 
       const paths = series.map((item, i) => {
-        const width = i < 3 ? 2.6 : 2;
-        return `<path class="trace-line" d="${smoothPath(item.points)}" fill="none" stroke="${item.color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" opacity="${i < 5 ? .95 : .74}" />`;
+        const width = i < 4 ? 2.8 : 1.9;
+        return `<path class="trace-line" d="${smoothPath(item.points)}" fill="none" stroke="${item.color}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" opacity="${i < 5 ? .96 : .56}" />`;
       }).join('');
 
       const cursorX = x(state.cursor);
       const dots = series.map(item => {
         const [, yy] = item.points[item.points.length - 1] || [cursorX, zeroY];
-        return `<circle cx="${cursorX}" cy="${yy}" r="3.6" fill="#fff" stroke="${item.color}" stroke-width="2" />`;
+        return `<circle cx="${cursorX}" cy="${yy}" r="4.2" fill="#fff" stroke="${item.color}" stroke-width="2.2" />`;
+      }).join('');
+      const labelRows = series
+        .slice()
+        .sort((a, b) => Math.abs(b.current) - Math.abs(a.current))
+        .slice(0, 6)
+        .map(item => ({
+          ...item,
+          rawY: item.fullPoints[item.fullPoints.length - 1]?.[1] || zeroY
+        }))
+        .sort((a, b) => a.rawY - b.rawY);
+      const minLabelGap = 16;
+      for (let i = 1; i < labelRows.length; i += 1) {
+        if (labelRows[i].rawY - labelRows[i - 1].rawY < minLabelGap) {
+          labelRows[i].rawY = labelRows[i - 1].rawY + minLabelGap;
+        }
+      }
+      for (let i = labelRows.length - 2; i >= 0; i -= 1) {
+        if (labelRows[i + 1].rawY > h - pad.b - 8) {
+          labelRows[i + 1].rawY = h - pad.b - 8;
+        }
+        if (labelRows[i + 1].rawY - labelRows[i].rawY < minLabelGap) {
+          labelRows[i].rawY = labelRows[i + 1].rawY - minLabelGap;
+        }
+      }
+      const labels = labelRows.map(item => {
+        const [, lineY] = item.fullPoints[item.fullPoints.length - 1] || [w - pad.r, zeroY];
+        const yy = Math.max(pad.t + 12, Math.min(h - pad.b - 8, item.rawY));
+        return `<line x1="${w - pad.r}" y1="${lineY}" x2="${w - pad.r + 8}" y2="${yy}" stroke="${item.color}" stroke-width="1" opacity=".45" />
+          <circle cx="${w - pad.r + 8}" cy="${yy}" r="3" fill="${item.color}" />
+          <text x="${w - pad.r + 16}" y="${yy + 4}" fill="#263241" font-size="12" font-weight="700">${item.name}</text>`;
       }).join('');
       const tagX = Math.min(w - pad.r - 48, Math.max(pad.l + 4, cursorX - 24));
       const snapshotHint = state.source === 'eastmoney-live' && frames.length < 2
@@ -1143,66 +1040,40 @@
         : '';
 
       el.lineChart.innerHTML = `
-        <rect x="0" y="0" width="${w}" height="${h}" fill="#fff" />
-        <rect x="${pad.l}" y="${pad.t}" width="${chartW}" height="${zeroY - pad.t}" fill="#d83b38" opacity=".035" />
-        <rect x="${pad.l}" y="${zeroY}" width="${chartW}" height="${pad.t + chartH - zeroY}" fill="#15865f" opacity=".035" />
+        <defs>
+          <linearGradient id="chartBg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ffffff" />
+            <stop offset="100%" stop-color="#f8fafc" />
+          </linearGradient>
+          <filter id="lineGlow" x="-10%" y="-20%" width="120%" height="140%">
+            <feGaussianBlur stdDeviation="1.6" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <rect x="0" y="0" width="${w}" height="${h}" fill="url(#chartBg)" />
+        <rect x="${pad.l}" y="${pad.t}" width="${chartW}" height="${zeroY - pad.t}" fill="#d83b38" opacity=".028" />
+        <rect x="${pad.l}" y="${zeroY}" width="${chartW}" height="${pad.t + chartH - zeroY}" fill="#15865f" opacity=".028" />
         ${grid}
         <line x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${h - pad.b}" stroke="#d8dde6" />
         <line x1="${pad.l}" y1="${h - pad.b}" x2="${w - pad.r}" y2="${h - pad.b}" stroke="#d8dde6" />
-        ${paths}
-        <line x1="${cursorX}" y1="${pad.t}" x2="${cursorX}" y2="${h - pad.b}" stroke="#2662d9" stroke-dasharray="4 4" />
+        <g>${ghostPaths}</g>
+        <g filter="url(#lineGlow)">${paths}</g>
+        <line x1="${cursorX}" y1="${pad.t}" x2="${cursorX}" y2="${h - pad.b}" stroke="#2662d9" stroke-dasharray="4 5" opacity=".76" />
         ${dots}
+        ${labels}
         ${snapshotHint}
         <rect x="${tagX}" y="4" width="48" height="18" rx="9" fill="#f1f5fb" stroke="#d9e0ea" />
         <text x="${tagX + 24}" y="17" fill="#394150" font-size="11" text-anchor="middle">${currentFrame.time}</text>
         <text x="${pad.l}" y="${h - 10}" fill="#7a8491" font-size="11">09:30</text>
         <text x="${w - pad.r - 34}" y="${h - 10}" fill="#7a8491" font-size="11">15:00</text>
-        <text x="8" y="16" fill="#7a8491" font-size="11">较开盘/亿元</text>
+        <text x="${pad.l}" y="16" fill="#7a8491" font-size="11">较开盘/亿元</text>
       `;
     }
 
-    function renderDetails(ranked) {
-      const frame = state.frames[state.cursor] || { values: {} };
-      const first = state.frames[0] || { values: {} };
-      const names = state.traceSectors.length
-        ? state.traceSectors.slice(0, Math.min(8, Number(el.topSelect.value)))
-        : ranked.slice(0, Math.min(8, Number(el.topSelect.value))).map(d => d.sector);
-      const rows = names.map((name, idx) => {
-        const changeYi = toYi(frame.values[name] || 0) - toYi(first.values[name] || 0);
-        return {
-          name,
-          color: colorFor(idx),
-          changeYi,
-          currentNet: frame.values[name] || 0
-        };
-      }).sort((a, b) => Math.abs(b.currentNet) - Math.abs(a.currentNet));
-      el.detailList.innerHTML = rows.map(item => {
-        const currentCls = item.currentNet >= 0 ? 'pos' : 'neg';
-        const changeCls = item.changeYi >= 0 ? 'pos' : 'neg';
-        return `<div class="list-item trace-item">
-          <span class="trace-dot" style="background:${item.color}"></span>
-          <span class="trace-name">
-            <strong>${item.name}</strong>
-            <span class="trace-meta ${changeCls}">较开盘 ${item.changeYi >= 0 ? '+' : ''}${item.changeYi.toFixed(2)}亿</span>
-          </span>
-          <span class="trace-change ${currentCls}">${formatMoney(item.currentNet)}</span>
-        </div>`;
-      }).join('');
-    }
-
     function renderSummary(ranked) {
-      const frame = state.frames[state.cursor] || { time: '--:--', values: {} };
-      const total = Object.values(frame.values).reduce((sum, value) => sum + value, 0);
-      const byValue = Object.entries(frame.values).map(([sector, value]) => ({ sector, value })).sort((a, b) => b.value - a.value);
-      const leader = byValue[0];
-      const laggard = byValue[byValue.length - 1];
-      el.timeMetric.textContent = frame.time;
-      el.totalMetric.textContent = formatMoney(total);
-      el.totalMetric.className = `metric-value ${total >= 0 ? 'pos' : 'neg'}`;
-      el.leaderMetric.textContent = leader ? `${leader.sector} ${formatMoney(leader.value)}` : '--';
-      el.leaderMetric.className = 'metric-value pos';
-      el.laggardMetric.textContent = laggard ? `${laggard.sector} ${formatMoney(laggard.value)}` : '--';
-      el.laggardMetric.className = 'metric-value neg';
       const progress = state.frames.length <= 1 ? 0 : state.cursor / (state.frames.length - 1) * 100;
       el.progressBar.style.width = `${progress}%`;
     }
@@ -1213,7 +1084,6 @@
       renderSummary(ranked);
       renderBars(ranked);
       renderLineChart(ranked);
-      renderDetails(ranked);
     }
 
     function tick() {
