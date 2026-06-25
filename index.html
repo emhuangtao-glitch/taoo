@@ -208,9 +208,6 @@
       width: 100%;
       margin: 0 auto;
       padding: 16px 22px 24px;
-      display: grid;
-      grid-template-columns: minmax(420px, 1fr) minmax(360px, 520px);
-      gap: 16px;
       min-height: 0;
     }
 
@@ -244,8 +241,8 @@
     }
 
     .rank-grid {
-      height: calc(100vh - 236px);
-      min-height: 520px;
+      height: calc(100vh - 508px);
+      min-height: 360px;
       display: grid;
       grid-template-columns: 1fr 1fr;
       border-bottom: 1px solid var(--line);
@@ -275,8 +272,8 @@
     }
 
     .bars {
-      height: calc(100vh - 236px);
-      min-height: 520px;
+      height: calc(100vh - 508px);
+      min-height: 360px;
       position: relative;
       overflow: hidden;
     }
@@ -407,7 +404,8 @@
     .value.neg { color: var(--green); }
 
     .chart-wrap {
-      padding: 10px 12px 6px;
+      padding: 12px 14px 4px;
+      border-bottom: 1px solid var(--line);
     }
 
     svg {
@@ -418,7 +416,7 @@
 
     .timeline {
       padding: 12px 15px 15px;
-      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
       display: grid;
       grid-template-columns: 64px 1fr 64px;
       gap: 10px;
@@ -444,9 +442,11 @@
     }
 
     .list {
-      border-top: 1px solid var(--line);
-      max-height: 236px;
+      max-height: 156px;
       overflow: auto;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border-bottom: 1px solid var(--line);
     }
 
     .list-item {
@@ -454,6 +454,7 @@
       grid-template-columns: 1fr auto auto;
       gap: 10px;
       padding: 9px 12px;
+      border-right: 1px solid #eef1f5;
       border-bottom: 1px solid #eef1f5;
       align-items: center;
       font-size: 13px;
@@ -521,7 +522,6 @@
       }
 
       main {
-        grid-template-columns: 1fr;
         padding: 14px;
       }
 
@@ -533,6 +533,10 @@
         height: auto;
         min-height: 0;
         grid-template-columns: 1fr;
+      }
+
+      .list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
       .rank-board {
@@ -626,9 +630,18 @@
     <main>
       <section class="panel">
         <div class="panel-head">
-          <div class="panel-title">板块资金排行</div>
-          <div class="panel-note" id="barNote">单位：亿元</div>
+          <div class="panel-title">板块资金轨迹与排行</div>
+          <div class="panel-note" id="barNote">轨迹、时间轴、排行同步联动</div>
         </div>
+        <div class="chart-wrap">
+          <svg id="lineChart" viewBox="0 0 960 280" role="img" aria-label="板块资金流轨迹"></svg>
+        </div>
+        <div class="timeline">
+          <span>09:30</span>
+          <div class="progress"><span id="progressBar"></span></div>
+          <span style="text-align:right">15:00</span>
+        </div>
+        <div class="list" id="detailList"></div>
         <div class="rank-grid" aria-label="资金流入和流出排行">
           <div class="rank-board">
             <div class="rank-board-head">
@@ -645,22 +658,6 @@
             <div class="bars" id="outflowBars" aria-label="资金净流出排行"></div>
           </div>
         </div>
-        <div class="timeline">
-          <span>09:30</span>
-          <div class="progress"><span id="progressBar"></span></div>
-          <span style="text-align:right">15:00</span>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div class="panel-title">资金轨迹</div>
-          <div class="panel-note">固定显示日内波动靠前板块</div>
-        </div>
-        <div class="chart-wrap">
-          <svg id="lineChart" viewBox="0 0 520 320" role="img" aria-label="板块资金流轨迹"></svg>
-        </div>
-        <div class="list" id="detailList"></div>
       </section>
     </main>
   </div>
@@ -1100,9 +1097,9 @@
     }
 
     function renderLineChart(ranked) {
-      const w = 520;
-      const h = 320;
-      const pad = { l: 50, r: 18, t: 22, b: 36 };
+      const w = 960;
+      const h = 280;
+      const pad = { l: 50, r: 18, t: 22, b: 34 };
       const names = state.traceSectors.length
         ? state.traceSectors.slice(0, Math.min(8, Number(el.topSelect.value)))
         : ranked.slice(0, Math.min(8, Number(el.topSelect.value))).map(d => d.sector);
