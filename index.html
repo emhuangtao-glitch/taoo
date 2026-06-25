@@ -587,14 +587,14 @@
           <div class="rank-board">
             <div class="rank-board-head">
               <span>净流入排行</span>
-              <span>由高到低</span>
+              <span id="inflowCount">Top --</span>
             </div>
             <div class="bars" id="inflowBars" aria-label="资金净流入排行"></div>
           </div>
           <div class="rank-board">
             <div class="rank-board-head">
               <span>净流出排行</span>
-              <span>由低到高</span>
+              <span id="outflowCount">Top --</span>
             </div>
             <div class="bars" id="outflowBars" aria-label="资金净流出排行"></div>
           </div>
@@ -649,6 +649,8 @@
       laggardMetric: document.getElementById('laggardMetric'),
       inflowBars: document.getElementById('inflowBars'),
       outflowBars: document.getElementById('outflowBars'),
+      inflowCount: document.getElementById('inflowCount'),
+      outflowCount: document.getElementById('outflowCount'),
       progressBar: document.getElementById('progressBar'),
       lineChart: document.getElementById('lineChart'),
       detailList: document.getElementById('detailList')
@@ -656,6 +658,7 @@
 
     const DATA_CSV_URL = 'data/fund-flow.csv';
     const AUTO_REFRESH_MS = 60000;
+    const MAX_RANK_SIZE = 30;
     let autoRefreshTimer = null;
 
     function jsonp(url, timeoutMs = 12000) {
@@ -818,12 +821,21 @@
       stop();
       const scope = el.scopeSelect.value;
       const fs = scope === 'industry' ? 'm:90+t:2' : 'm:90+t:3';
-      const listUrl = `https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=30&po=1&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent(fs)}&fields=f12,f14,f62,f184&ut=${EASTMONEY_UT}`;
-      const listPayload = await jsonp(listUrl);
-      const boards = listPayload?.data?.diff || [];
-      if (!boards.length) throw new Error('没有返回板块列表');
+      const buildListUrl = po => `https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=80&po=${po}&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent(fs)}&fields=f12,f14,f62,f184&ut=${EASTMONEY_UT}`;
+      const [inflowPayload, outflowPayload] = await Promise.all([
+        jsonp(buildListUrl(1)),
+        jsonp(buildListUrl(0))
+      ]);
+      const inflowBoards = inflowPayload?.data?.diff || [];
+      const outflowBoards = outflowPayload?.data?.diff || [];
+      if (!inflowBoards.length && !outflowBoards.length) throw new Error('没有返回板块列表');
 
-      const picked = boards.slice(0, 20).map(board => ({
+      const boardMap = new Map();
+      [...inflowBoards.slice(0, MAX_RANK_SIZE), ...outflowBoards.slice(0, MAX_RANK_SIZE)].forEach(board => {
+        if (board?.f12) boardMap.set(board.f12, board);
+      });
+
+      const picked = Array.from(boardMap.values()).map(board => ({
         code: board.f12,
         name: board.f14,
         current: Number(board.f62) || 0
@@ -923,6 +935,8 @@
       const topN = Number(el.topSelect.value);
       const inflow = ranked.filter(item => item.value > 0).sort((a, b) => b.value - a.value).slice(0, topN);
       const outflow = ranked.filter(item => item.value < 0).sort((a, b) => a.value - b.value).slice(0, topN);
+      el.inflowCount.textContent = `Top ${inflow.length}/${topN}`;
+      el.outflowCount.textContent = `Top ${outflow.length}/${topN}`;
       renderRankBoard(el.inflowBars, inflow, 'inflow');
       renderRankBoard(el.outflowBars, outflow, 'outflow');
     }
