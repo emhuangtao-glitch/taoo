@@ -821,7 +821,7 @@
       stop();
       const scope = el.scopeSelect.value;
       const fs = scope === 'industry' ? 'm:90+t:2' : 'm:90+t:3';
-      const buildListUrl = po => `https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=80&po=${po}&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent(fs)}&fields=f12,f14,f62,f184&ut=${EASTMONEY_UT}`;
+      const buildListUrl = po => `https://push2delay.eastmoney.com/api/qt/clist/get?pn=1&pz=80&po=${po}&np=1&fltt=2&invt=2&fid=f62&fs=${encodeURIComponent(fs)}&fields=f12,f14,f62,f184&ut=${EASTMONEY_UT}`;
       const [inflowPayload, outflowPayload] = await Promise.all([
         jsonp(buildListUrl(1)),
         jsonp(buildListUrl(0))
@@ -843,25 +843,60 @@
 
       setStatus(`已找到 ${picked.length} 个板块，正在拉取日内分钟资金流...`);
       const series = [];
+      let minuteFailures = 0;
       await Promise.all(picked.map(async board => {
         const secid = `90.${board.code}`;
-        const url = `https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?lmt=0&klt=1&secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63&ut=${EASTMONEY_UT}`;
-        const payload = await jsonp(url);
-        const klines = payload?.data?.klines || [];
-        klines.forEach(line => {
-          const cells = String(line).split(',');
-          const time = String(cells[0] || '').slice(11, 16);
-          const netFlow = Number(cells[1]);
-          if (/^\d{2}:\d{2}$/.test(time) && Number.isFinite(netFlow)) {
-            series.push({ time, sector: board.name, netFlow });
+        const urls = [
+          `https://push2his.eastmoney.com/api/qt/stock/fflow/daykline/get?lmt=0&klt=1&secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63&ut=${EASTMONEY_UT}`,
+          `https://push2delay.eastmoney.com/api/qt/stock/fflow/daykline/get?lmt=0&klt=1&secid=${secid}&fields1=f1,f2,f3,f7&fields2=f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f62,f63&ut=${EASTMONEY_UT}`
+        ];
+
+        try {
+          let klines = [];
+          for (const url of urls) {
+            try {
+              const payload = await jsonp(url, 6000);
+              klines = payload?.data?.klines || [];
+              if (klines.length) break;
+            } catch (err) {
+              // Try the next host before falling back to estimated intraday points.
+            }
           }
-        });
+          if (!klines.length) throw new Error('分钟资金流为空');
+          klines.forEach(line => {
+            const cells = String(line).split(',');
+            const time = String(cells[0] || '').slice(11, 16);
+            const netFlow = Number(cells[1]);
+            if (/^\d{2}:\d{2}$/.test(time) && Number.isFinite(netFlow)) {
+              series.push({ time, sector: board.name, netFlow });
+            }
+          });
+        } catch (err) {
+          minuteFailures += 1;
+          buildEstimatedIntradaySeries(board).forEach(point => series.push(point));
+        }
       }));
 
       if (!series.length) throw new Error('分钟资金流为空');
       const normalized = normalizeFrames(series);
       setData({ ...normalized, source: 'eastmoney' });
-      setStatus(`东方财富公开接口加载完成：${normalized.sectors.length} 个板块，${normalized.frames.length} 个时间点。`);
+      const note = minuteFailures
+        ? `其中 ${minuteFailures} 个板块分钟线不可用，已用当前净额平滑估算。`
+        : '全部使用分钟资金线。';
+      setStatus(`东方财富公开接口加载完成：${normalized.sectors.length} 个板块，${normalized.frames.length} 个时间点。${note}`);
+    }
+
+    function buildEstimatedIntradaySeries(board) {
+      const times = marketMinutes();
+      return times.map((time, idx) => {
+        const progress = idx / Math.max(1, times.length - 1);
+        const eased = 1 - Math.pow(1 - progress, 1.7);
+        return {
+          time,
+          sector: board.name,
+          netFlow: Math.round(board.current * eased)
+        };
+      });
     }
 
     async function loadSiteData() {
