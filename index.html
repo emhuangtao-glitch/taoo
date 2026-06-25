@@ -877,7 +877,9 @@
         ? state.traceSectors.slice(0, Math.min(8, Number(el.topSelect.value)))
         : ranked.slice(0, Math.min(8, Number(el.topSelect.value))).map(d => d.sector);
       const frames = state.frames;
-      const maxAbs = Math.max(1, ...frames.flatMap(frame => names.map(name => Math.abs(toYi(frame.values[name] || 0)))));
+      const baseline = Object.fromEntries(names.map(name => [name, toYi(frames[0]?.values?.[name] || 0)]));
+      const relativeValue = (frame, name) => toYi(frame.values[name] || 0) - (baseline[name] || 0);
+      const maxAbs = Math.max(1, ...frames.flatMap(frame => names.map(name => Math.abs(relativeValue(frame, name)))));
       const x = idx => pad.l + idx / Math.max(1, frames.length - 1) * (w - pad.l - pad.r);
       const y = val => pad.t + (1 - ((val / maxAbs) + 1) / 2) * (h - pad.t - pad.b);
 
@@ -888,14 +890,14 @@
       }).join('');
 
       const paths = names.map((name, i) => {
-        const points = frames.slice(0, state.cursor + 1).map((frame, idx) => `${x(idx)},${y(toYi(frame.values[name] || 0))}`).join(' ');
+        const points = frames.slice(0, state.cursor + 1).map((frame, idx) => `${x(idx)},${y(relativeValue(frame, name))}`).join(' ');
         return `<polyline points="${points}" fill="none" stroke="${colorFor(i)}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />`;
       }).join('');
 
       const cursorX = x(state.cursor);
       const labels = names.map((name, i) => {
         const frame = frames[state.cursor] || { values: {} };
-        const yy = y(toYi(frame.values[name] || 0));
+        const yy = y(relativeValue(frame, name));
         return `<circle cx="${cursorX}" cy="${yy}" r="3.5" fill="${colorFor(i)}" />
           <text x="${Math.min(w - 120, cursorX + 7)}" y="${yy - 5}" fill="${colorFor(i)}" font-size="11" font-weight="650">${name}</text>`;
       }).join('');
@@ -910,7 +912,7 @@
         ${labels}
         <text x="${pad.l}" y="${h - 10}" fill="#7a8491" font-size="11">09:30</text>
         <text x="${w - pad.r - 34}" y="${h - 10}" fill="#7a8491" font-size="11">15:00</text>
-        <text x="8" y="16" fill="#7a8491" font-size="11">亿元</text>
+        <text x="8" y="16" fill="#7a8491" font-size="11">较开盘变化/亿元</text>
       `;
     }
 
